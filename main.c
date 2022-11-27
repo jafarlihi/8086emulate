@@ -158,7 +158,7 @@ uint16_t sign_extend(uint8_t value) {
 int main(int argc, char *argv[]) {
   assert(calculate_address(0x08F1, 0x0100) == 0x09010);
 
-  char *ram = calloc(0xFFFFF, sizeof(char));
+  uint8_t *ram = calloc(0xFFFFF, sizeof(uint8_t));
   RegisterState *registerState = calloc(1, sizeof(RegisterState));
   registerState->ip = 0x0000;
 
@@ -189,6 +189,10 @@ int main(int argc, char *argv[]) {
   *(ram + 14) = 0b00000010;
   *(ram + 15) = 0b11101011;
   registerState->bx = 5;
+  // mov 0xf00f, di
+  *(ram + 16) = 0b10111111;
+  *(ram + 17) = 0b00001111;
+  *(ram + 18) = 0b11110000;
 
   while (true) {
     uint8_t curr_insn = *(ram + registerState->ip);
@@ -201,8 +205,8 @@ int main(int argc, char *argv[]) {
     }
 
     if ((curr_insn & 0b11111000) == 0b01000000) { // inc r16
-      char reg = curr_insn & 0b00000111;
-      *((char *)registerState + reg * 2) += 1;
+      uint8_t reg = curr_insn & 0b00000111;
+      *((uint16_t *)registerState + reg) += 1;
       registerState->ip += 1;
     } else if ((curr_insn & 0b11111111) == 0b11111110) {
       // TODO: Flags
@@ -223,7 +227,7 @@ int main(int argc, char *argv[]) {
       ModRM *modRM = makeModRM(*(ram + registerState->ip + 1));
       if (modRM->mid == 0b000) { // inc r/m16
         if (modRM->mod == MOD_REGISTER) {
-          *((char *)registerState + modRM->rm * 2) += 1;
+          *((uint8_t *)registerState + modRM->rm * 2) += 1;
           registerState->ip += 2;
         } else if (modRM->mod == MOD_ONE_BYTE_DISPLACEMENT) {
           switch (modRM->rm) {
@@ -250,6 +254,16 @@ int main(int argc, char *argv[]) {
           registerState->ip += 3;
         }
       }
+    } else if (((curr_insn & 0b11110000) >> 4) == 0b00001011) {
+      bool word = ((curr_insn & 0b00001000) >> 3) == 1;
+      uint8_t reg = curr_insn & 0b00000111;
+      if (word) {
+        uint16_t data = (((uint16_t)*(ram + registerState->ip + 2)) << 8) | (uint16_t)(unsigned char)*(ram + registerState->ip + 1);
+        *((uint16_t *)registerState + reg) += data;
+        registerState->ip += 3;
+      } else {
+        registerState->ip += 2;
+      }
     } else if (registerState->ip >= 0xFFFE) {
       break;
     } else if (curr_insn == 0) { // add r/m8, r8
@@ -275,6 +289,7 @@ int main(int argc, char *argv[]) {
   assert(ram[0b00001010111111100010] == 1);
   assert(ram[calculate_address(registerState->ds, 0x5af0)] == 1);
   assert(registerState->cx == (5 << 8) + 1);
+  assert(registerState->di == 0xf00f);
 
   return 0;
 }
