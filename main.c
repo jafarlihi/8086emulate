@@ -118,6 +118,11 @@ int main(int argc, char *argv[]) {
   *(ram + 9) = 0b01011100;
   registerState->es = 0b0000000011110000;
   registerState->si = 0b1010000010000110;
+  // incb 0x5af0
+  *(ram + 10) = 0b11111110;
+  *(ram + 11) = 0b00000110;
+  *(ram + 12) = 0b11110000;
+  *(ram + 13) = 0b01011010;
 
   while (true) {
     uint8_t curr_insn = *(ram + registerState->ip);
@@ -136,8 +141,16 @@ int main(int argc, char *argv[]) {
     } else if ((curr_insn & 0b11111111) == 0b11111110) {
       // TODO: Flags
       ModRM *modRM = makeModRM(*(ram + registerState->ip + 1));
-      if (modRM->mod == MOD_REGISTER && modRM->opcode == 0b000) // inc r/m8
-        *((char *)registerState + modRM->rm * 2) += 1;
+      if (modRM->opcode == 0b000) { // inc r/m8
+        if (modRM->mod == MOD_REGISTER)
+          *((char *)registerState + modRM->rm * 2) += 1;
+        if (modRM->mod == MOD_REGISTER_INDIRECT && modRM->rm == bp_na) { // direct memory addressing
+          uint16_t segment = get_segment_by_sop(registerState, curr_seg);
+          uint16_t offset = (((uint16_t)*(ram + registerState->ip + 3)) << 8) | (uint16_t)(unsigned char)*(ram + registerState->ip + 2);
+          ram[calculate_address(segment, offset)] += 1;
+          registerState->ip += 2;
+        }
+      }
       registerState->ip += 2;
     } else if ((curr_insn & 0b11111111) == 0b11111111) {
       // TODO: Flags
@@ -180,6 +193,7 @@ int main(int argc, char *argv[]) {
   assert(registerState->cx == 1);
   assert(ram[0b11111010111111100010] == 1);
   assert(ram[0b00001010111111100010] == 1);
+  assert(ram[calculate_address(registerState->ds, 0x5af0)] == 1);
 
   return 0;
 }
