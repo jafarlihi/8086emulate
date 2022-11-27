@@ -162,6 +162,7 @@ int main(int argc, char *argv[]) {
   RegisterState *registerState = calloc(1, sizeof(RegisterState));
   registerState->ip = 0x0000;
 
+  // TODO: Fix these instruction comments
   // inc bp
   *ram = 0b01000101;
   // inc cx
@@ -185,14 +186,19 @@ int main(int argc, char *argv[]) {
   *(ram + 11) = 0b00000110;
   *(ram + 12) = 0b11110000;
   *(ram + 13) = 0b01011010;
-  // add bl, ch
+  // add ch, bl
   *(ram + 14) = 0b00000010;
   *(ram + 15) = 0b11101011;
   registerState->bx = 5;
-  // mov 0xf00f, di
+  // mov di, 0xf00f
   *(ram + 16) = 0b10111111;
   *(ram + 17) = 0b00001111;
   *(ram + 18) = 0b11110000;
+  // movw [di], 0xf00f // TODO: Wrong bit pattern?
+  *(ram + 19) = 0b11000111;
+  *(ram + 20) = 0b00000111;
+  *(ram + 21) = 0b00001111;
+  *(ram + 22) = 0b11110000;
 
   while (true) {
     uint8_t curr_insn = *(ram + registerState->ip);
@@ -257,12 +263,26 @@ int main(int argc, char *argv[]) {
     } else if (((curr_insn & 0b11110000) >> 4) == 0b00001011) {
       bool word = ((curr_insn & 0b00001000) >> 3) == 1;
       uint8_t reg = curr_insn & 0b00000111;
-      if (word) {
+      if (word) { // mov r16, imm16
         uint16_t data = (((uint16_t)*(ram + registerState->ip + 2)) << 8) | (uint16_t)(unsigned char)*(ram + registerState->ip + 1);
         *((uint16_t *)registerState + reg) += data;
         registerState->ip += 3;
-      } else {
+      } else { // mov r8, imm8
         registerState->ip += 2;
+      }
+    } else if ((curr_insn & 0b11111110) == 0b11000110) {
+      bool word = curr_insn & 0b00000001;
+      if (word) { // mov [r/m16] imm16
+        ModRM *modRM = makeModRM(*(ram + registerState->ip + 1));
+        uint16_t data = (((uint16_t)*(ram + registerState->ip + 3)) << 8) | (uint16_t)(unsigned char)*(ram + registerState->ip + 2);
+        uint16_t segment = get_segment_by_sop(registerState, curr_seg);
+        uint16_t offset = *((uint16_t *)registerState + modRM->rm);
+        ram[calculate_address(segment, offset)] += data;
+        ram[calculate_address(segment, offset) + 1] += data >> 8;
+        registerState->ip += 4;
+      } else { // mov [r/m16] imm8 // TODO: [r/m8]?
+        ModRM *modRM = makeModRM(*(ram + registerState->ip + 1));
+        registerState->ip += 3;
       }
     } else if (registerState->ip >= 0xFFFE) {
       break;
@@ -290,6 +310,8 @@ int main(int argc, char *argv[]) {
   assert(ram[calculate_address(registerState->ds, 0x5af0)] == 1);
   assert(registerState->cx == (5 << 8) + 1);
   assert(registerState->di == 0xf00f);
+  assert(ram[calculate_address(0xf0f0, 0xf00f)] == 0x0f);
+  assert(ram[calculate_address(0xf0f0, 0xf00f) + 1] == 0xf0);
 
   return 0;
 }
