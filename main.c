@@ -2,6 +2,7 @@
 #include <stdint.h>
 #include <stdlib.h>
 #include <stdio.h>
+#include <stdbool.h>
 
 typedef struct RegisterState {
   uint16_t ax;
@@ -31,6 +32,27 @@ typedef enum RegisterEncoding {
   di = 0b111,
 } RegisterEncoding;
 
+typedef enum Mod {
+  MOD_REGISTER_INDIRECT = 0b00,
+  MOD_ONE_BYTE_DISPLACEMENT = 0b01,
+  MOD_FOUR_BYTE_DISPLACEMENT = 0b10,
+  MOD_REGISTER = 0b11,
+} Mod;
+
+typedef struct ModRM {
+  Mod mod;
+  uint8_t opcode;
+  uint8_t rm;
+} ModRM;
+
+ModRM *makeModRM(uint32_t value) {
+  ModRM *result = calloc(1, sizeof(ModRM));
+  result->mod = (value & 0b11000000) >> 6;
+  result->opcode = (value & 0b00111000) >> 3;
+  result->rm = value & 0b00000111;
+  return result;
+}
+
 uint32_t calculate_address(uint16_t segment, uint16_t offset) {
   return segment * 16 + offset;
 }
@@ -40,15 +62,35 @@ int main(int argc, char *argv[]) {
 
   char *ram = calloc(0xFFFFF, sizeof(char));
   RegisterState *registerState = calloc(1, sizeof(RegisterState));
+  registerState->ip = 0x0000;
 
   *ram = 0b01000101;
+  *(ram + 1) = 0b11111111;
+  *(ram + 2) = 0b11000001;
 
-  if (*ram & 0b01000000 > 0) { // inc r16
-    char reg = *ram & 0b00000111;
-    *((char *)registerState + reg * 2) += 1;
+  while (true) {
+    if ((*(ram + registerState->ip) & 0b11111000) == 0b01000000) { // inc r16
+      char reg = *ram & 0b00000111;
+      *((char *)registerState + reg * 2) += 1;
+      registerState->ip += 1;
+    } else if ((*(ram + registerState->ip) & 0b11111111) == 0b11111110) {
+      // TODO: Flags
+      ModRM *modRM = makeModRM(*(ram + registerState->ip + 1));
+      if (modRM->mod == MOD_REGISTER && modRM->opcode == 0b000) // inc r/m8
+        *((char *)registerState + modRM->rm * 2) += 1;
+      registerState->ip += 2;
+    } else if ((*(ram + registerState->ip) & 0b11111111) == 0b11111111) {
+      ModRM *modRM = makeModRM(*(ram + registerState->ip + 1));
+      if (modRM->mod == MOD_REGISTER && modRM->opcode == 0b000) // inc r/m16
+        *((char *)registerState + modRM->rm * 2) += 1;
+      registerState->ip += 2;
+    } else if (*(ram + registerState->ip) == 0b00000000) {
+      break;
+    }
   }
 
   assert(registerState->bp == 1);
+  assert(registerState->cx == 1);
 
   return 0;
 }
