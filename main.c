@@ -80,6 +80,7 @@ int main(int argc, char *argv[]) {
         *((char *)registerState + modRM->rm * 2) += 1;
       registerState->ip += 2;
     } else if ((*(ram + registerState->ip) & 0b11111111) == 0b11111111) {
+      // TODO: Flags
       ModRM *modRM = makeModRM(*(ram + registerState->ip + 1));
       if (modRM->mod == MOD_REGISTER && modRM->opcode == 0b000) // inc r/m16
         *((char *)registerState + modRM->rm * 2) += 1;
