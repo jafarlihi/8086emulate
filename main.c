@@ -68,6 +68,11 @@ uint32_t calculate_address(uint16_t segment, uint16_t offset) {
   return segment * 16 + offset;
 }
 
+uint16_t sign_extend(uint8_t value) {
+  bool sign = (value & 0b10000000) > 0;
+  return sign ? 0b1111111111111111 & (uint16_t)value : 0b0000000011111111 & (uint16_t)value;
+}
+
 int main(int argc, char *argv[]) {
   assert(calculate_address(0x08F1, 0x0100) == 0x09010);
 
@@ -84,6 +89,8 @@ int main(int argc, char *argv[]) {
   *(ram + 3) = 0b11111111;
   *(ram + 4) = 0b01000100;
   *(ram + 5) = 0b01011100;
+  registerState->ds = 0b1111000011110000;
+  registerState->si = 0b1010000010000110;
 
   while (true) {
     if ((*(ram + registerState->ip) & 0b11111000) == 0b01000000) { // inc r16
@@ -115,6 +122,8 @@ int main(int argc, char *argv[]) {
             case bp_di:
               break;
             case na_si:
+              uint16_t offset = sign_extend(*(ram + registerState->ip + 2)) + registerState->si;
+              ram[calculate_address(registerState->ds, offset)] += 1;
               break;
             case na_di:
               break;
@@ -132,6 +141,7 @@ int main(int argc, char *argv[]) {
 
   assert(registerState->bp == 1);
   assert(registerState->cx == 1);
+  assert(ram[0b11111010111111100010] == 1);
 
   return 0;
 }
