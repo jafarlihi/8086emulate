@@ -32,6 +32,67 @@ typedef enum RegisterEncoding {
   di = 0b111,
 } RegisterEncoding;
 
+typedef enum RegisterEncoding8 {
+  al = 0b000,
+  cl = 0b001,
+  dl = 0b010,
+  bl = 0b011,
+  ah = 0b100,
+  ch = 0b101,
+  dh = 0b110,
+  bh = 0b111,
+} RegisterEncoding8;
+
+void add_8bit_by_register_encoding(RegisterState *state, uint8_t encoding, int value) {
+  switch (encoding) {
+    case al:
+      state->ax += value;
+      break;
+    case cl:
+      state->cx += value;
+      break;
+    case dl:
+      state->dx += value;
+      break;
+    case bl:
+      state->bx += value;
+      break;
+    case ah:
+      state->ax = state->ax + (value << 8);
+      break;
+    case ch:
+      state->cx = state->cx + (value << 8);
+      break;
+    case dh:
+      state->dx = state->dx + (value << 8);
+      break;
+    case bh:
+      state->bx = state->bx + (value << 8);
+      break;
+  }
+}
+
+uint8_t get_8bit_by_register_encoding(RegisterState *state, uint8_t encoding) {
+  switch (encoding) {
+    case al:
+      return (uint8_t)state->ax;
+    case cl:
+      return (uint8_t)state->cx;
+    case dl:
+      return (uint8_t)state->dx;
+    case bl:
+      return (uint8_t)state->bx;
+    case ah:
+      return state->ax >> 8;
+    case ch:
+      return state->cx >> 8;
+    case dh:
+      return state->dx >> 8;
+    case bh:
+      return state->bx >> 8;
+  }
+}
+
 typedef enum SegmentOverridePrefix {
   so_es = 0b00,
   so_cs = 0b01,
@@ -72,14 +133,14 @@ typedef enum RM {
 
 typedef struct ModRM {
   Mod mod;
-  uint8_t opcode;
+  uint8_t mid;
   uint8_t rm;
 } ModRM;
 
-ModRM *makeModRM(uint32_t value) {
+ModRM *makeModRM(uint8_t value) {
   ModRM *result = calloc(1, sizeof(ModRM));
   result->mod = (value & 0b11000000) >> 6;
-  result->opcode = (value & 0b00111000) >> 3;
+  result->mid = (value & 0b00111000) >> 3;
   result->rm = value & 0b00000111;
   return result;
 }
@@ -127,6 +188,7 @@ int main(int argc, char *argv[]) {
   // add bl, ch
   *(ram + 14) = 0b00000010;
   *(ram + 15) = 0b11101011;
+  registerState->bx = 5;
 
   while (true) {
     uint8_t curr_insn = *(ram + registerState->ip);
@@ -145,10 +207,10 @@ int main(int argc, char *argv[]) {
     } else if ((curr_insn & 0b11111111) == 0b11111110) {
       // TODO: Flags
       ModRM *modRM = makeModRM(*(ram + registerState->ip + 1));
-      if (modRM->opcode == 0b000) { // inc r/m8
+      if (modRM->mid == 0b000) { // inc r/m8
         if (modRM->mod == MOD_REGISTER)
-          *((char *)registerState + modRM->rm * 2) += 1;
-        if (modRM->mod == MOD_REGISTER_INDIRECT && modRM->rm == bp_na) { // direct memory addressing
+          add_8bit_by_register_encoding(registerState, modRM->rm, 1);
+        else if (modRM->mod == MOD_REGISTER_INDIRECT && modRM->rm == bp_na) { // direct memory addressing
           uint16_t segment = get_segment_by_sop(registerState, curr_seg);
           uint16_t offset = (((uint16_t)*(ram + registerState->ip + 3)) << 8) | (uint16_t)(unsigned char)*(ram + registerState->ip + 2);
           ram[calculate_address(segment, offset)] += 1;
@@ -159,7 +221,7 @@ int main(int argc, char *argv[]) {
     } else if ((curr_insn & 0b11111111) == 0b11111111) {
       // TODO: Flags
       ModRM *modRM = makeModRM(*(ram + registerState->ip + 1));
-      if (modRM->opcode == 0b000) { // inc r/m16
+      if (modRM->mid == 0b000) { // inc r/m16
         if (modRM->mod == MOD_REGISTER) {
           *((char *)registerState + modRM->rm * 2) += 1;
           registerState->ip += 2;
@@ -195,6 +257,12 @@ int main(int argc, char *argv[]) {
     } else if (curr_insn == 1) { // add r/m16, r16
       registerState->ip += 2;
     } else if (curr_insn == 2) { // add r8, r/m8
+      ModRM *modRM = makeModRM(*(ram + registerState->ip + 1));
+      if (modRM->mod == MOD_REGISTER) {
+        uint8_t dest = modRM->mid;
+        uint8_t src = modRM->rm;
+        add_8bit_by_register_encoding(registerState, dest, get_8bit_by_register_encoding(registerState, src));
+      }
       registerState->ip += 2;
     } else if (curr_insn == 3) { // add r16, r/m16
       registerState->ip += 2;
@@ -202,10 +270,11 @@ int main(int argc, char *argv[]) {
   }
 
   assert(registerState->bp == 1);
-  assert(registerState->cx == 1);
+  //assert(registerState->cx == 1);
   assert(ram[0b11111010111111100010] == 1);
   assert(ram[0b00001010111111100010] == 1);
   assert(ram[calculate_address(registerState->ds, 0x5af0)] == 1);
+  assert(registerState->cx == (5 << 8) + 1);
 
   return 0;
 }
