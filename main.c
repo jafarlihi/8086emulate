@@ -199,6 +199,10 @@ int main(int argc, char *argv[]) {
   *(ram + 20) = 0b00000111;
   *(ram + 21) = 0b00001111;
   *(ram + 22) = 0b11110000;
+  // addw [di], 0x0f
+  *(ram + 23) = 0b10000011;
+  *(ram + 24) = 0b00000111;
+  *(ram + 25) = 0b00001111;
 
   while (true) {
     uint8_t curr_insn = *(ram + registerState->ip);
@@ -284,6 +288,21 @@ int main(int argc, char *argv[]) {
         ModRM *modRM = makeModRM(*(ram + registerState->ip + 1));
         registerState->ip += 3;
       }
+    } else if ((curr_insn & 0b10000000) == 0b10000000) {
+      bool sign = curr_insn & 0b00000010;
+      bool word = curr_insn & 0b00000001;
+      if (!sign && word) { // add r/m16 imm16
+        ModRM *modRM = makeModRM(*(ram + registerState->ip + 1));
+        registerState->ip += 4;
+      } else { // add r/m16 imm8
+        ModRM *modRM = makeModRM(*(ram + registerState->ip + 1));
+        uint16_t data = sign_extend(*(ram + registerState->ip + 2));
+        uint16_t segment = get_segment_by_sop(registerState, curr_seg);
+        uint16_t offset = *((uint16_t *)registerState + modRM->rm);
+        ram[calculate_address(segment, offset)] += data;
+        ram[calculate_address(segment, offset) + 1] += data >> 8;
+        registerState->ip += 3;
+      }
     } else if (registerState->ip >= 0xFFFE) {
       break;
     } else if (curr_insn == 0) { // add r/m8, r8
@@ -310,7 +329,7 @@ int main(int argc, char *argv[]) {
   assert(ram[calculate_address(registerState->ds, 0x5af0)] == 1);
   assert(registerState->cx == (5 << 8) + 1);
   assert(registerState->di == 0xf00f);
-  assert(ram[calculate_address(0xf0f0, 0xf00f)] == 0x0f);
+  assert(ram[calculate_address(0xf0f0, 0xf00f)] == 0x1e);
   assert(ram[calculate_address(0xf0f0, 0xf00f) + 1] == 0xf0);
 
   return 0;
