@@ -32,6 +32,13 @@ typedef enum RegisterEncoding {
   di = 0b111,
 } RegisterEncoding;
 
+typedef enum SegmentOverridePrefix {
+  so_es = 0b00,
+  so_cs = 0b01,
+  so_ss = 0b10,
+  so_ds = 0b11,
+} SegmentOverridePrefix;
+
 typedef enum Mod {
   MOD_REGISTER_INDIRECT = 0b00,
   MOD_ONE_BYTE_DISPLACEMENT = 0b01,
@@ -93,17 +100,26 @@ int main(int argc, char *argv[]) {
   registerState->si = 0b1010000010000110;
 
   while (true) {
-    if ((*(ram + registerState->ip) & 0b11111000) == 0b01000000) { // inc r16
+    uint8_t curr_insn = *(ram + registerState->ip);
+    uint8_t curr_seg = 0b11;
+    bool is_segment_override_prefix = (curr_insn & 0b11100111) == 0b00100110;
+    if (is_segment_override_prefix) {
+      curr_seg = (curr_insn & 0b00011000) >> 3;
+      registerState->ip += 1;
+      curr_insn = *(ram + registerState->ip);
+    }
+
+    if ((curr_insn & 0b11111000) == 0b01000000) { // inc r16
       char reg = *ram & 0b00000111;
       *((char *)registerState + reg * 2) += 1;
       registerState->ip += 1;
-    } else if ((*(ram + registerState->ip) & 0b11111111) == 0b11111110) {
+    } else if ((curr_insn & 0b11111111) == 0b11111110) {
       // TODO: Flags
       ModRM *modRM = makeModRM(*(ram + registerState->ip + 1));
       if (modRM->mod == MOD_REGISTER && modRM->opcode == 0b000) // inc r/m8
         *((char *)registerState + modRM->rm * 2) += 1;
       registerState->ip += 2;
-    } else if ((*(ram + registerState->ip) & 0b11111111) == 0b11111111) {
+    } else if ((curr_insn & 0b11111111) == 0b11111111) {
       // TODO: Flags
       ModRM *modRM = makeModRM(*(ram + registerState->ip + 1));
       if (modRM->opcode == 0b000) // inc r/m16
