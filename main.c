@@ -88,6 +88,7 @@ uint32_t calculate_address(uint16_t segment, uint16_t offset) {
   return segment * 16 + offset;
 }
 
+// Just cast instead?
 uint16_t sign_extend(uint8_t value) {
   bool sign = (value & 0b10000000) > 0;
   return sign ? 0b1111111111111111 & (uint16_t)value : 0b0000000011111111 & (uint16_t)value;
@@ -123,6 +124,9 @@ int main(int argc, char *argv[]) {
   *(ram + 11) = 0b00000110;
   *(ram + 12) = 0b11110000;
   *(ram + 13) = 0b01011010;
+  // add bl, ch
+  *(ram + 14) = 0b00000010;
+  *(ram + 15) = 0b11101011;
 
   while (true) {
     uint8_t curr_insn = *(ram + registerState->ip);
@@ -135,7 +139,7 @@ int main(int argc, char *argv[]) {
     }
 
     if ((curr_insn & 0b11111000) == 0b01000000) { // inc r16
-      char reg = *ram & 0b00000111;
+      char reg = curr_insn & 0b00000111;
       *((char *)registerState + reg * 2) += 1;
       registerState->ip += 1;
     } else if ((curr_insn & 0b11111111) == 0b11111110) {
@@ -155,12 +159,11 @@ int main(int argc, char *argv[]) {
     } else if ((curr_insn & 0b11111111) == 0b11111111) {
       // TODO: Flags
       ModRM *modRM = makeModRM(*(ram + registerState->ip + 1));
-      if (modRM->opcode == 0b000) // inc r/m16
+      if (modRM->opcode == 0b000) { // inc r/m16
         if (modRM->mod == MOD_REGISTER) {
           *((char *)registerState + modRM->rm * 2) += 1;
           registerState->ip += 2;
-        }
-        else if (modRM->mod == MOD_ONE_BYTE_DISPLACEMENT) {
+        } else if (modRM->mod == MOD_ONE_BYTE_DISPLACEMENT) {
           switch (modRM->rm) {
             case bx_si:
               break;
@@ -184,8 +187,17 @@ int main(int argc, char *argv[]) {
           }
           registerState->ip += 3;
         }
-    } else if (*(ram + registerState->ip) == 0b00000000) {
+      }
+    } else if (registerState->ip >= 0xFFFE) {
       break;
+    } else if (curr_insn == 0) { // add r/m8, r8
+      registerState->ip += 2;
+    } else if (curr_insn == 1) { // add r/m16, r16
+      registerState->ip += 2;
+    } else if (curr_insn == 2) { // add r8, r/m8
+      registerState->ip += 2;
+    } else if (curr_insn == 3) { // add r16, r/m16
+      registerState->ip += 2;
     }
   }
 
