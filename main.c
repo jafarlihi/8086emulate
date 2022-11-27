@@ -39,6 +39,19 @@ typedef enum SegmentOverridePrefix {
   so_ds = 0b11,
 } SegmentOverridePrefix;
 
+uint16_t get_segment_by_sop(RegisterState *state, uint8_t sop) {
+  switch (sop) {
+    case so_es:
+      return state->es;
+    case so_cs:
+      return state->cs;
+    case so_ss:
+      return state->ss;
+    case so_ds:
+      return state->ds;
+  }
+}
+
 typedef enum Mod {
   MOD_REGISTER_INDIRECT = 0b00,
   MOD_ONE_BYTE_DISPLACEMENT = 0b01,
@@ -98,6 +111,13 @@ int main(int argc, char *argv[]) {
   *(ram + 5) = 0b01011100;
   registerState->ds = 0b1111000011110000;
   registerState->si = 0b1010000010000110;
+  // es incw 0x5c(si)
+  *(ram + 6) = 0b00100110;
+  *(ram + 7) = 0b11111111;
+  *(ram + 8) = 0b01000100;
+  *(ram + 9) = 0b01011100;
+  registerState->es = 0b0000000011110000;
+  registerState->si = 0b1010000010000110;
 
   while (true) {
     uint8_t curr_insn = *(ram + registerState->ip);
@@ -138,8 +158,9 @@ int main(int argc, char *argv[]) {
             case bp_di:
               break;
             case na_si:
+              uint16_t segment = get_segment_by_sop(registerState, curr_seg);
               uint16_t offset = sign_extend(*(ram + registerState->ip + 2)) + registerState->si;
-              ram[calculate_address(registerState->ds, offset)] += 1;
+              ram[calculate_address(segment, offset)] += 1;
               break;
             case na_di:
               break;
@@ -158,6 +179,7 @@ int main(int argc, char *argv[]) {
   assert(registerState->bp == 1);
   assert(registerState->cx == 1);
   assert(ram[0b11111010111111100010] == 1);
+  assert(ram[0b00001010111111100010] == 1);
 
   return 0;
 }
