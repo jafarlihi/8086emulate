@@ -35,9 +35,20 @@ typedef enum RegisterEncoding {
 typedef enum Mod {
   MOD_REGISTER_INDIRECT = 0b00,
   MOD_ONE_BYTE_DISPLACEMENT = 0b01,
-  MOD_FOUR_BYTE_DISPLACEMENT = 0b10,
+  MOD_TWO_BYTE_DISPLACEMENT = 0b10,
   MOD_REGISTER = 0b11,
 } Mod;
+
+typedef enum RM {
+  bx_si = 0b000,
+  bx_di = 0b001,
+  bp_si = 0b010,
+  bp_di = 0b011,
+  na_si = 0b100,
+  na_di = 0b101,
+  bp_na = 0b110,
+  bx_na = 0b111,
+} RM;
 
 typedef struct ModRM {
   Mod mod;
@@ -64,9 +75,15 @@ int main(int argc, char *argv[]) {
   RegisterState *registerState = calloc(1, sizeof(RegisterState));
   registerState->ip = 0x0000;
 
+  // inc bp
   *ram = 0b01000101;
+  // inc cx
   *(ram + 1) = 0b11111111;
   *(ram + 2) = 0b11000001;
+  // incw 0x5c(si)
+  *(ram + 3) = 0b11111111;
+  *(ram + 4) = 0b01000100;
+  *(ram + 5) = 0b01011100;
 
   while (true) {
     if ((*(ram + registerState->ip) & 0b11111000) == 0b01000000) { // inc r16
@@ -82,9 +99,32 @@ int main(int argc, char *argv[]) {
     } else if ((*(ram + registerState->ip) & 0b11111111) == 0b11111111) {
       // TODO: Flags
       ModRM *modRM = makeModRM(*(ram + registerState->ip + 1));
-      if (modRM->mod == MOD_REGISTER && modRM->opcode == 0b000) // inc r/m16
-        *((char *)registerState + modRM->rm * 2) += 1;
-      registerState->ip += 2;
+      if (modRM->opcode == 0b000) // inc r/m16
+        if (modRM->mod == MOD_REGISTER) {
+          *((char *)registerState + modRM->rm * 2) += 1;
+          registerState->ip += 2;
+        }
+        else if (modRM->mod == MOD_ONE_BYTE_DISPLACEMENT) {
+          switch (modRM->rm) {
+            case bx_si:
+              break;
+            case bx_di:
+              break;
+            case bp_si:
+              break;
+            case bp_di:
+              break;
+            case na_si:
+              break;
+            case na_di:
+              break;
+            case bp_na:
+              break;
+            case bx_na:
+              break;
+          }
+          registerState->ip += 3;
+        }
     } else if (*(ram + registerState->ip) == 0b00000000) {
       break;
     }
