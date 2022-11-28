@@ -137,7 +137,7 @@ typedef struct ModRM {
   uint8_t rm;
 } ModRM;
 
-ModRM *makeModRM(uint8_t value) {
+ModRM *make_modrm(uint8_t value) {
   ModRM *result = calloc(1, sizeof(ModRM));
   result->mod = (value & 0b11000000) >> 6;
   result->mid = (value & 0b00111000) >> 3;
@@ -220,7 +220,7 @@ int main(int argc, char *argv[]) {
       registerState->ip += 1;
     } else if ((curr_insn & 0b11111111) == 0b11111110) {
       // TODO: Flags
-      ModRM *modRM = makeModRM(*(ram + registerState->ip + 1));
+      ModRM *modRM = make_modrm(*(ram + registerState->ip + 1));
       if (modRM->mid == 0b000) { // inc r/m8
         if (modRM->mod == MOD_REGISTER)
           add_8bit_by_register_encoding(registerState, modRM->rm, 1);
@@ -234,7 +234,7 @@ int main(int argc, char *argv[]) {
       registerState->ip += 2;
     } else if ((curr_insn & 0b11111111) == 0b11111111) {
       // TODO: Flags
-      ModRM *modRM = makeModRM(*(ram + registerState->ip + 1));
+      ModRM *modRM = make_modrm(*(ram + registerState->ip + 1));
       if (modRM->mid == 0b000) { // inc r/m16
         if (modRM->mod == MOD_REGISTER) {
           *((uint8_t *)registerState + modRM->rm * 2) += 1;
@@ -277,7 +277,7 @@ int main(int argc, char *argv[]) {
     } else if ((curr_insn & 0b11111110) == 0b11000110) {
       bool word = curr_insn & 0b00000001;
       if (word) { // mov [r/m16] imm16
-        ModRM *modRM = makeModRM(*(ram + registerState->ip + 1));
+        ModRM *modRM = make_modrm(*(ram + registerState->ip + 1));
         uint16_t data = (((uint16_t)*(ram + registerState->ip + 3)) << 8) | (uint16_t)(unsigned char)*(ram + registerState->ip + 2);
         uint16_t segment = get_segment_by_sop(registerState, curr_seg);
         uint16_t offset = *((uint16_t *)registerState + modRM->rm);
@@ -285,17 +285,17 @@ int main(int argc, char *argv[]) {
         ram[calculate_address(segment, offset) + 1] += data >> 8;
         registerState->ip += 4;
       } else { // mov [r/m16] imm8 // TODO: [r/m8]?
-        ModRM *modRM = makeModRM(*(ram + registerState->ip + 1));
+        ModRM *modRM = make_modrm(*(ram + registerState->ip + 1));
         registerState->ip += 3;
       }
     } else if ((curr_insn & 0b10000000) == 0b10000000) {
       bool sign = curr_insn & 0b00000010;
       bool word = curr_insn & 0b00000001;
       if (!sign && word) { // add r/m16 imm16
-        ModRM *modRM = makeModRM(*(ram + registerState->ip + 1));
+        ModRM *modRM = make_modrm(*(ram + registerState->ip + 1));
         registerState->ip += 4;
       } else { // add r/m16 imm8
-        ModRM *modRM = makeModRM(*(ram + registerState->ip + 1));
+        ModRM *modRM = make_modrm(*(ram + registerState->ip + 1));
         uint16_t data = sign_extend(*(ram + registerState->ip + 2));
         uint16_t segment = get_segment_by_sop(registerState, curr_seg);
         uint16_t offset = *((uint16_t *)registerState + modRM->rm);
@@ -310,7 +310,7 @@ int main(int argc, char *argv[]) {
     } else if (curr_insn == 1) { // add r/m16, r16
       registerState->ip += 2;
     } else if (curr_insn == 2) { // add r8, r/m8
-      ModRM *modRM = makeModRM(*(ram + registerState->ip + 1));
+      ModRM *modRM = make_modrm(*(ram + registerState->ip + 1));
       if (modRM->mod == MOD_REGISTER) {
         uint8_t dest = modRM->mid;
         uint8_t src = modRM->rm;
