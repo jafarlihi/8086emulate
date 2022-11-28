@@ -134,7 +134,7 @@ typedef enum RM {
 typedef struct ModRM {
   Mod mod;
   uint8_t mid;
-  uint8_t rm;
+  RM rm;
 } ModRM;
 
 ModRM *make_modrm(uint8_t value) {
