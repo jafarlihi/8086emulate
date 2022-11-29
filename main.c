@@ -155,55 +155,7 @@ uint16_t sign_extend(uint8_t value) {
   return sign ? 0b1111111111111111 & (uint16_t)value : 0b0000000011111111 & (uint16_t)value;
 }
 
-int main(int argc, char *argv[]) {
-  assert(calculate_address(0x08F1, 0x0100) == 0x09010);
-
-  uint8_t *ram = calloc(0xFFFFF, sizeof(uint8_t));
-  RegisterState *registerState = calloc(1, sizeof(RegisterState));
-  registerState->ip = 0x0000;
-
-  // TODO: Fix these instruction comments
-  // inc bp
-  *ram = 0b01000101;
-  // inc cx
-  *(ram + 1) = 0b11111111;
-  *(ram + 2) = 0b11000001;
-  // incw 0x5c(si)
-  *(ram + 3) = 0b11111111;
-  *(ram + 4) = 0b01000100;
-  *(ram + 5) = 0b01011100;
-  registerState->ds = 0b1111000011110000;
-  registerState->si = 0b1010000010000110;
-  // es incw 0x5c(si)
-  *(ram + 6) = 0b00100110;
-  *(ram + 7) = 0b11111111;
-  *(ram + 8) = 0b01000100;
-  *(ram + 9) = 0b01011100;
-  registerState->es = 0b0000000011110000;
-  registerState->si = 0b1010000010000110;
-  // incb 0x5af0
-  *(ram + 10) = 0b11111110;
-  *(ram + 11) = 0b00000110;
-  *(ram + 12) = 0b11110000;
-  *(ram + 13) = 0b01011010;
-  // add ch, bl
-  *(ram + 14) = 0b00000010;
-  *(ram + 15) = 0b11101011;
-  registerState->bx = 5;
-  // mov di, 0xf00f
-  *(ram + 16) = 0b10111111;
-  *(ram + 17) = 0b00001111;
-  *(ram + 18) = 0b11110000;
-  // movw [di], 0xf00f // TODO: Wrong bit pattern?
-  *(ram + 19) = 0b11000111;
-  *(ram + 20) = 0b00000111;
-  *(ram + 21) = 0b00001111;
-  *(ram + 22) = 0b11110000;
-  // addw [di], 0x0f
-  *(ram + 23) = 0b10000011;
-  *(ram + 24) = 0b00000111;
-  *(ram + 25) = 0b00001111;
-
+void execute(RegisterState *registerState, uint8_t *ram) {
   while (true) {
     uint8_t curr_insn = *(ram + registerState->ip);
     uint8_t curr_seg = 0b11;
@@ -322,6 +274,61 @@ int main(int argc, char *argv[]) {
     }
   }
 
+}
+
+#ifdef TEST_8086EMULATE
+
+int main(int argc, char *argv[]) {
+  assert(calculate_address(0x08F1, 0x0100) == 0x09010);
+
+  uint8_t *ram = calloc(0xFFFFF, sizeof(uint8_t));
+  RegisterState *registerState = calloc(1, sizeof(RegisterState));
+  registerState->ip = 0x0000;
+
+  // TODO: Fix these instruction comments
+  // inc bp
+  *ram = 0b01000101;
+  // inc cx
+  *(ram + 1) = 0b11111111;
+  *(ram + 2) = 0b11000001;
+  // incw 0x5c(si)
+  *(ram + 3) = 0b11111111;
+  *(ram + 4) = 0b01000100;
+  *(ram + 5) = 0b01011100;
+  registerState->ds = 0b1111000011110000;
+  registerState->si = 0b1010000010000110;
+  // es incw 0x5c(si)
+  *(ram + 6) = 0b00100110;
+  *(ram + 7) = 0b11111111;
+  *(ram + 8) = 0b01000100;
+  *(ram + 9) = 0b01011100;
+  registerState->es = 0b0000000011110000;
+  registerState->si = 0b1010000010000110;
+  // incb 0x5af0
+  *(ram + 10) = 0b11111110;
+  *(ram + 11) = 0b00000110;
+  *(ram + 12) = 0b11110000;
+  *(ram + 13) = 0b01011010;
+  // add ch, bl
+  *(ram + 14) = 0b00000010;
+  *(ram + 15) = 0b11101011;
+  registerState->bx = 5;
+  // mov di, 0xf00f
+  *(ram + 16) = 0b10111111;
+  *(ram + 17) = 0b00001111;
+  *(ram + 18) = 0b11110000;
+  // movw [di], 0xf00f // TODO: Wrong bit pattern?
+  *(ram + 19) = 0b11000111;
+  *(ram + 20) = 0b00000111;
+  *(ram + 21) = 0b00001111;
+  *(ram + 22) = 0b11110000;
+  // addw [di], 0x0f
+  *(ram + 23) = 0b10000011;
+  *(ram + 24) = 0b00000111;
+  *(ram + 25) = 0b00001111;
+
+  execute(registerState, ram);
+
   assert(registerState->bp == 1);
   //assert(registerState->cx == 1);
   assert(ram[0b11111010111111100010] == 1);
@@ -334,3 +341,5 @@ int main(int argc, char *argv[]) {
 
   return 0;
 }
+
+#endif
