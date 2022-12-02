@@ -3,9 +3,9 @@
 #include <curses.h>
 #include <signal.h>
 
-int termx, termy, mapwinx, mapwiny, sidebarx, sidebary, bottombarx, bottombary;
+int termx, termy, topbarx, topbary, bottombarx, bottombary;
 
-WINDOW *mapwin, *sidebar, *bottombar;
+WINDOW *topbar, *bottombar;
 
 void terminal_start();
 void terminal_stop();
@@ -18,6 +18,7 @@ void terminal_start() {
   cbreak();
   noecho();
   keypad(stdscr, TRUE);
+  curs_set(0);
   refresh();
 }
 
@@ -27,20 +28,22 @@ void terminal_stop() {
 
 void get_window_dimensions() {
   getmaxyx(stdscr, termy, termx);
-  mapwinx = termx - (termx / 10 * 3);
-  sidebarx = termx - mapwinx;
+  topbarx = termx;
   bottombarx = termx;
-  mapwiny = termy - (termy / 10 * 3);
-  sidebary = mapwiny;
-  bottombary = termy - mapwiny;
-  mapwin = newwin(mapwiny, mapwinx, 0, 0);
-  sidebar = newwin(sidebary, sidebarx, 0, mapwinx);
-  bottombar = newwin(bottombary, bottombarx, mapwiny, 0);
+  topbary = termy - (termy / 10 * 3);
+  bottombary = termy - topbary;
+  topbar = newwin(topbary, topbarx, 0, 0);
+  bottombar = newwin(bottombary, bottombarx, topbary, 0);
 }
 
 void draw_window(WINDOW* win, int height, int width) {
-  wborder(win, 0, 0, 0, 0, 0, 0, 0, 0);
+  if (win == bottombar) {
+    wborder(win, 0, 0, 0, 0, 0, 0, 0, 0);
+    move(termy - 1, 2);
+    printw("%s", "'q' to quit | 's' to single-step | 'r' to run");
+  }
   wrefresh(win);
+  refresh();
 }
 
 void resize_handler(int sig) {
@@ -48,8 +51,7 @@ void resize_handler(int sig) {
   terminal_start();
   clear();
   get_window_dimensions();
-  draw_window(mapwin, mapwiny, mapwinx);
-  draw_window(sidebar, sidebary, sidebarx);
+  draw_window(topbar, topbary, topbarx);
   draw_window(bottombar, bottombary, bottombarx);
 }
 
@@ -60,15 +62,14 @@ int main(int argc, char *argv[]) {
   int c;
   get_window_dimensions();
 
-  while (true) {
-    draw_window(mapwin, mapwiny, mapwinx);
-    draw_window(sidebar, sidebary, sidebarx);
-    draw_window(bottombar, bottombary, bottombarx);
+  draw_window(topbar, topbary, topbarx);
+  draw_window(bottombar, bottombary, bottombarx);
 
+  while (true) {
     c = 0;
     c = getch();
 
-    if (c == 'q' || c == 27 /*ESC*/)
+    if (c == 'q')
       break;
   }
 
