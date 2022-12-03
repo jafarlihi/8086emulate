@@ -4,6 +4,7 @@
 #include <stdlib.h>
 #include <curses.h>
 #include <signal.h>
+#include <stdlib.h>
 
 int termx, termy, topbarx, topbary, bottombarx, bottombary;
 
@@ -58,8 +59,9 @@ void resize_handler(int sig) {
 }
 
 char *get_objdump(uint8_t *content) {
-  FILE *write_ptr = fopen("/tmp/8086emulate-objdump.bin","wb");
-  fwrite(content, sizeof(content), 1, write_ptr);
+  FILE *write_ptr = fopen("/tmp/8086emulate-objdump.bin", "wb");
+  fwrite(content, sizeof(uint8_t), 0xFFFFF, write_ptr);
+  system("objdump -D /tmp/8086emulate-objdump.bin -b binary -m i8086 > /tmp/8086emulate-objdump.txt");
   return NULL;
 }
 
