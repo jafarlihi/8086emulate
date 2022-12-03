@@ -11,6 +11,7 @@ int termx, termy, topbarx, topbary, bottombarx, bottombary;
 WINDOW *topbar, *bottombar;
 char *objdump;
 Emulator *emulator;
+int step = 0;
 
 void terminal_start();
 void terminal_stop();
@@ -36,8 +37,8 @@ char *get_objdump(uint8_t *content) {
   fwrite(content, sizeof(uint8_t), 0xFFFFF, write_ptr);
 
   system("objdump -D /tmp/8086emulate-objdump.bin -b binary -m i8086 > /tmp/8086emulate-objdump.0.txt");
-  system("sed '0,/0:/d' /tmp/8086emulate-objdump.0.txt > /tmp/8086emulate-objdump.1.txt");
-  system("sed '$d' /tmp/8086emulate-objdump.1.txt > /tmp/8086emulate-objdump.txt");
+  system("sed '0,/00000000/d' /tmp/8086emulate-objdump.0.txt > /tmp/8086emulate-objdump.txt");
+  //system("sed '$d' /tmp/8086emulate-objdump.1.txt > /tmp/8086emulate-objdump.txt");
 
   char *buffer = NULL;
   size_t size = 0;
@@ -57,7 +58,7 @@ char *get_objdump(uint8_t *content) {
 void draw_objdump(void) {
   objdump = get_objdump(emulator->ram);
   wprintw(topbar, "%s\n", objdump);
-  wmove(topbar, 0, 0);
+  wmove(topbar, step++, 0);
   waddch(topbar, '>');
   wrefresh(topbar);
 }
@@ -129,6 +130,11 @@ void resize_handler(int sig) {
   refresh();
 }
 
+void single_step(void) {
+  execute(emulator, true);
+  resize_handler(0);
+}
+
 void init_ui(Emulator *emu) {
   emulator = emu;
   terminal_start();
@@ -149,6 +155,9 @@ void init_ui(Emulator *emu) {
 
     if (c == 'q')
       break;
+    else if (c == 's') {
+      single_step();
+    }
   }
 
   terminal_stop();
