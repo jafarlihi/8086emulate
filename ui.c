@@ -7,8 +7,9 @@
 #include <stdlib.h>
 
 int termx, termy, topbarx, topbary, bottombarx, bottombary;
-
 WINDOW *topbar, *bottombar;
+char *objdump;
+Emulator *emulator;
 
 void terminal_start();
 void terminal_stop();
@@ -27,6 +28,37 @@ void terminal_start() {
 
 void terminal_stop() {
   endwin();
+}
+
+char *get_objdump(uint8_t *content) {
+  FILE *write_ptr = fopen("/tmp/8086emulate-objdump.bin", "wb");
+  fwrite(content, sizeof(uint8_t), 0xFFFFF, write_ptr);
+
+  system("objdump -D /tmp/8086emulate-objdump.bin -b binary -m i8086 > /tmp/8086emulate-objdump.0.txt");
+  system("sed '0,/0:/d' /tmp/8086emulate-objdump.0.txt > /tmp/8086emulate-objdump.1.txt");
+  system("sed '$d' /tmp/8086emulate-objdump.1.txt > /tmp/8086emulate-objdump.txt");
+
+  char *buffer = NULL;
+  size_t size = 0;
+
+  FILE *fp = fopen("/tmp/8086emulate-objdump.txt", "r");
+
+  fseek(fp, 0, SEEK_END);
+  size = ftell(fp);
+  rewind(fp);
+  buffer = malloc((size + 1) * sizeof(*buffer));
+  fread(buffer, size, 1, fp);
+  buffer[size] = '\0';
+
+  return buffer;
+}
+
+void draw_objdump(void) {
+  objdump = get_objdump(emulator->ram);
+  wprintw(topbar, "%s\n", objdump);
+  wmove(topbar, 0, 0);
+  waddch(topbar, '>');
+  wrefresh(topbar);
 }
 
 void get_window_dimensions() {
@@ -56,16 +88,11 @@ void resize_handler(int sig) {
   get_window_dimensions();
   draw_window(topbar, topbary, topbarx);
   draw_window(bottombar, bottombary, bottombarx);
+  draw_objdump();
 }
 
-char *get_objdump(uint8_t *content) {
-  FILE *write_ptr = fopen("/tmp/8086emulate-objdump.bin", "wb");
-  fwrite(content, sizeof(uint8_t), 0xFFFFF, write_ptr);
-  system("objdump -D /tmp/8086emulate-objdump.bin -b binary -m i8086 > /tmp/8086emulate-objdump.txt");
-  return NULL;
-}
-
-void init_ui(Emulator *emulator) {
+void init_ui(Emulator *emu) {
+  emulator = emu;
   terminal_start();
   signal(SIGWINCH, resize_handler);
 
@@ -75,7 +102,7 @@ void init_ui(Emulator *emulator) {
   draw_window(topbar, topbary, topbarx);
   draw_window(bottombar, bottombary, bottombarx);
 
-  char *objdump = get_objdump(emulator->ram);
+  draw_objdump();
 
   while (true) {
     c = 0;
