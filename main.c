@@ -10,7 +10,7 @@ int main(int argc, char *argv[]) {
   assert(calculate_address(0x08F1, 0x0100) == 0x09010);
 
   uint8_t *payload = calloc(0xFFFFF, sizeof(uint8_t));
-  Emulator *emulator = makeEmulator(payload);
+  Emulator *emulator = make_emulator(payload);
 
   // TODO: Fix these instruction comments
   // inc bp

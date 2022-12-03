@@ -260,16 +260,26 @@ void execute(Emulator *emulator, bool single) {
   }
 }
 
-Emulator *makeEmulator(uint8_t *payload) {
+Emulator *make_emulator(uint8_t *payload) {
   Emulator *result = calloc(1, sizeof(Emulator));
   result->state = calloc(1, sizeof(RegisterState));
   result->ram = calloc(0xFFFFF, sizeof(uint8_t));
+  result->payload = payload;
   memcpy(result->ram, payload, 0xFFFFF);
   return result;
+}
+
+void reset_emulator(Emulator *emulator) {
+  free(emulator->ram);
+  free(emulator->state);
+  emulator->ram = calloc(0xFFFFF, sizeof(uint8_t));
+  memcpy(emulator->ram, emulator->payload, 0xFFFFF);
+  emulator->state = calloc(1, sizeof(RegisterState));
 }
 
 void change_payload(Emulator *emulator, uint8_t *payload) {
   free(emulator->ram);
   emulator->ram = calloc(0xFFFFF, sizeof(uint8_t));
   memcpy(emulator->ram, payload, 0xFFFFF);
+  emulator->payload = payload;
 }

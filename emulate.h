@@ -24,11 +24,13 @@ typedef struct RegisterState {
 typedef struct Emulator {
   RegisterState *state;
   uint8_t *ram;
+  uint8_t *payload;
 } Emulator;
 
-Emulator *makeEmulator(uint8_t *payload);
+Emulator *make_emulator(uint8_t *payload);
 void execute(Emulator *emulator, bool single);
 void change_payload(Emulator *emulator, uint8_t *payload);
+void reset_emulator(Emulator *emalator);
 uint32_t calculate_address(uint16_t segment, uint16_t offset);
 
 #endif

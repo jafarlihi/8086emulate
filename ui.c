@@ -65,7 +65,7 @@ void draw_objdump(void) {
 
 void draw_help(void) {
   move(termy - 1, 2);
-  printw("%s", "'q' to quit | 's' to single-step | 'r' to run");
+  printw("%s", "'q' to quit | 's' to single-step | 'r' to run | 'x' to reset");
 }
 
 #define BYTE_TO_BINARY_PATTERN "%c%c%c%c%c%c%c%c"
@@ -106,6 +106,7 @@ void get_window_dimensions() {
   bottombary = termy - topbary;
   topbar = newwin(topbary, topbarx, 0, 0);
   bottombar = newwin(bottombary, bottombarx, topbary, 0);
+  scrollok(topbar, true);
 }
 
 void draw_window(WINDOW* win, int height, int width) {
@@ -136,6 +137,18 @@ void single_step(void) {
   resize_handler(0);
 }
 
+void run(void) {
+  execute(emulator, false);
+  resize_handler(0);
+  step = 0xFFFFF;
+}
+
+void reset(void) {
+  reset_emulator(emulator);
+  step = 0;
+  resize_handler(0);
+}
+
 void init_ui(Emulator *emu) {
   emulator = emu;
   terminal_start();
@@ -156,9 +169,12 @@ void init_ui(Emulator *emu) {
 
     if (c == 'q')
       break;
-    else if (c == 's') {
+    else if (c == 's')
       single_step();
-    }
+    else if (c == 'r')
+      run();
+    else if (c == 'x')
+      reset();
   }
 
   terminal_stop();
