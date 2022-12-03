@@ -1,4 +1,5 @@
 #include "emulate.h"
+#include "ui.h"
 #include <stdbool.h>
 #include <assert.h>
 #include <stdlib.h>
@@ -66,6 +67,11 @@ int main(int argc, char *argv[]) {
   assert(emulator->state->di == 0xf00f);
   assert(emulator->ram[calculate_address(0xf0f0, 0xf00f)] == 0x1e);
   assert(emulator->ram[calculate_address(0xf0f0, 0xf00f) + 1] == 0xf0);
+
+  free(emulator->state);
+  emulator->state = calloc(1, sizeof(RegisterState));
+  change_payload(emulator, payload);
+  init_ui(emulator);
 
   return 0;
 }

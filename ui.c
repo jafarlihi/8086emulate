@@ -1,3 +1,5 @@
+#include "ui.h"
+#include "emulate.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <curses.h>
@@ -55,7 +57,13 @@ void resize_handler(int sig) {
   draw_window(bottombar, bottombary, bottombarx);
 }
 
-int init_ui(int argc, char *argv[]) {
+char *get_objdump(uint8_t *content) {
+  FILE *write_ptr = fopen("/tmp/8086emulate-objdump.bin","wb");
+  fwrite(content, sizeof(content), 1, write_ptr);
+  return NULL;
+}
+
+void init_ui(Emulator *emulator) {
   terminal_start();
   signal(SIGWINCH, resize_handler);
 
@@ -64,6 +72,8 @@ int init_ui(int argc, char *argv[]) {
 
   draw_window(topbar, topbary, topbarx);
   draw_window(bottombar, bottombary, bottombarx);
+
+  char *objdump = get_objdump(emulator->ram);
 
   while (true) {
     c = 0;
@@ -74,5 +84,4 @@ int init_ui(int argc, char *argv[]) {
   }
 
   terminal_stop();
-  return 0;
 }
