@@ -17,7 +17,7 @@ void terminal_start();
 void terminal_stop();
 void get_window_dimensions();
 void draw_window(WINDOW*, int, int);
-void resize_handler(int);
+void refresh_all(int);
 
 void terminal_start() {
   initscr();
@@ -118,7 +118,7 @@ void draw_window(WINDOW* win, int height, int width) {
   refresh();
 }
 
-void resize_handler(int sig) {
+void refresh_all(int sig) {
   terminal_stop();
   terminal_start();
   clear();
@@ -128,31 +128,31 @@ void resize_handler(int sig) {
   draw_objdump();
   draw_registers();
   draw_help();
-  if (sig != 0) step--;
+  if (sig != 0) step--; // TODO: Fix
   refresh();
 }
 
 void single_step(void) {
   execute(emulator, true);
-  resize_handler(0);
+  refresh_all(0);
 }
 
 void run(void) {
   execute(emulator, false);
-  resize_handler(0);
+  refresh_all(0);
   step = 0xFFFFF;
 }
 
 void reset(void) {
   reset_emulator(emulator);
   step = 0;
-  resize_handler(0);
+  refresh_all(0);
 }
 
 void init_ui(Emulator *emu) {
   emulator = emu;
   terminal_start();
-  signal(SIGWINCH, resize_handler);
+  signal(SIGWINCH, refresh_all);
 
   int c;
   get_window_dimensions();
