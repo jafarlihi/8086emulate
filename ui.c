@@ -127,6 +127,7 @@ void resize_handler(int sig) {
   draw_objdump();
   draw_registers();
   draw_help();
+  if (sig != 0) step--;
   refresh();
 }
 
