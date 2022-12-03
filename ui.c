@@ -55,7 +55,7 @@ void resize_handler(int sig) {
   draw_window(bottombar, bottombary, bottombarx);
 }
 
-int main(int argc, char *argv[]) {
+int init_ui(int argc, char *argv[]) {
   terminal_start();
   signal(SIGWINCH, resize_handler);
 

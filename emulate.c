@@ -1,25 +1,9 @@
-#include <assert.h>
+#include "emulate.h"
 #include <stdint.h>
 #include <stdlib.h>
 #include <stdio.h>
 #include <stdbool.h>
-
-typedef struct RegisterState {
-  uint16_t ax;
-  uint16_t cx;
-  uint16_t dx;
-  uint16_t bx;
-  uint16_t sp;
-  uint16_t bp;
-  uint16_t si;
-  uint16_t di;
-  uint16_t cs;
-  uint16_t ds;
-  uint16_t ss;
-  uint16_t es;
-  uint16_t ip;
-  uint16_t flags;
-} RegisterState;
+#include <string.h>
 
 typedef enum RegisterEncoding {
   ax = 0b000,
@@ -155,42 +139,42 @@ uint16_t sign_extend(uint8_t value) {
   return sign ? 0b1111111111111111 & (uint16_t)value : 0b0000000011111111 & (uint16_t)value;
 }
 
-void execute(RegisterState *registerState, uint8_t *ram) {
+void execute(Emulator *emulator, bool single) {
   while (true) {
-    uint8_t curr_insn = *(ram + registerState->ip);
+    uint8_t curr_insn = *(emulator->ram + emulator->state->ip);
     uint8_t curr_seg = 0b11;
     bool is_segment_override_prefix = (curr_insn & 0b11100111) == 0b00100110;
     if (is_segment_override_prefix) {
       curr_seg = (curr_insn & 0b00011000) >> 3;
-      registerState->ip += 1;
-      curr_insn = *(ram + registerState->ip);
+      emulator->state->ip += 1;
+      curr_insn = *(emulator->ram + emulator->state->ip);
     }
 
     if ((curr_insn & 0b11111000) == 0b01000000) { // inc r16
       uint8_t reg = curr_insn & 0b00000111;
-      *((uint16_t *)registerState + reg) += 1;
-      registerState->ip += 1;
+      *((uint16_t *)emulator->state + reg) += 1;
+      emulator->state->ip += 1;
     } else if ((curr_insn & 0b11111111) == 0b11111110) {
       // TODO: Flags
-      ModRM *modrm = make_modrm(*(ram + registerState->ip + 1));
+      ModRM *modrm = make_modrm(*(emulator->ram + emulator->state->ip + 1));
       if (modrm->mid == 0b000) { // inc r/m8
         if (modrm->mod == MOD_REGISTER)
-          add_8bit_by_register_encoding(registerState, modrm->rm, 1);
+          add_8bit_by_register_encoding(emulator->state, modrm->rm, 1);
         else if (modrm->mod == MOD_REGISTER_INDIRECT && modrm->rm == bp_na) { // direct memory addressing
-          uint16_t segment = get_segment_by_sop(registerState, curr_seg);
-          uint16_t offset = (((uint16_t)*(ram + registerState->ip + 3)) << 8) | (uint16_t)(unsigned char)*(ram + registerState->ip + 2);
-          ram[calculate_address(segment, offset)] += 1;
-          registerState->ip += 2;
+          uint16_t segment = get_segment_by_sop(emulator->state, curr_seg);
+          uint16_t offset = (((uint16_t)*(emulator->ram + emulator->state->ip + 3)) << 8) | (uint16_t)(unsigned char)*(emulator->ram + emulator->state->ip + 2);
+          emulator->ram[calculate_address(segment, offset)] += 1;
+          emulator->state->ip += 2;
         }
       }
-      registerState->ip += 2;
+      emulator->state->ip += 2;
     } else if ((curr_insn & 0b11111111) == 0b11111111) {
       // TODO: Flags
-      ModRM *modrm = make_modrm(*(ram + registerState->ip + 1));
+      ModRM *modrm = make_modrm(*(emulator->ram + emulator->state->ip + 1));
       if (modrm->mid == 0b000) { // inc r/m16
         if (modrm->mod == MOD_REGISTER) {
-          *((uint8_t *)registerState + modrm->rm * 2) += 1;
-          registerState->ip += 2;
+          *((uint8_t *)emulator->state + modrm->rm * 2) += 1;
+          emulator->state->ip += 2;
         } else if (modrm->mod == MOD_ONE_BYTE_DISPLACEMENT) {
           switch (modrm->rm) {
             case bx_si:
@@ -202,9 +186,9 @@ void execute(RegisterState *registerState, uint8_t *ram) {
             case bp_di:
               break;
             case na_si:
-              uint16_t segment = get_segment_by_sop(registerState, curr_seg);
-              uint16_t offset = sign_extend(*(ram + registerState->ip + 2)) + registerState->si;
-              ram[calculate_address(segment, offset)] += 1;
+              uint16_t segment = get_segment_by_sop(emulator->state, curr_seg);
+              uint16_t offset = sign_extend(*(emulator->ram + emulator->state->ip + 2)) + emulator->state->si;
+              emulator->ram[calculate_address(segment, offset)] += 1;
               break;
             case na_di:
               break;
@@ -213,133 +197,79 @@ void execute(RegisterState *registerState, uint8_t *ram) {
             case bx_na:
               break;
           }
-          registerState->ip += 3;
+          emulator->state->ip += 3;
         }
       }
     } else if (((curr_insn & 0b11110000) >> 4) == 0b00001011) {
       bool word = ((curr_insn & 0b00001000) >> 3) == 1;
       uint8_t reg = curr_insn & 0b00000111;
       if (word) { // mov r16, imm16
-        uint16_t data = (((uint16_t)*(ram + registerState->ip + 2)) << 8) | (uint16_t)(unsigned char)*(ram + registerState->ip + 1);
-        *((uint16_t *)registerState + reg) += data;
-        registerState->ip += 3;
+        uint16_t data = (((uint16_t)*(emulator->ram + emulator->state->ip + 2)) << 8) | (uint16_t)(unsigned char)*(emulator->ram + emulator->state->ip + 1);
+        *((uint16_t *)emulator->state + reg) += data;
+        emulator->state->ip += 3;
       } else { // mov r8, imm8
-        registerState->ip += 2;
+        emulator->state->ip += 2;
       }
     } else if ((curr_insn & 0b11111110) == 0b11000110) {
       bool word = curr_insn & 0b00000001;
       if (word) { // mov [r/m16] imm16
-        ModRM *modrm = make_modrm(*(ram + registerState->ip + 1));
-        uint16_t data = (((uint16_t)*(ram + registerState->ip + 3)) << 8) | (uint16_t)(unsigned char)*(ram + registerState->ip + 2);
-        uint16_t segment = get_segment_by_sop(registerState, curr_seg);
-        uint16_t offset = *((uint16_t *)registerState + modrm->rm);
-        ram[calculate_address(segment, offset)] += data;
-        ram[calculate_address(segment, offset) + 1] += data >> 8;
-        registerState->ip += 4;
+        ModRM *modrm = make_modrm(*(emulator->ram + emulator->state->ip + 1));
+        uint16_t data = (((uint16_t)*(emulator->ram + emulator->state->ip + 3)) << 8) | (uint16_t)(unsigned char)*(emulator->ram + emulator->state->ip + 2);
+        uint16_t segment = get_segment_by_sop(emulator->state, curr_seg);
+        uint16_t offset = *((uint16_t *)emulator->state + modrm->rm);
+        emulator->ram[calculate_address(segment, offset)] += data;
+        emulator->ram[calculate_address(segment, offset) + 1] += data >> 8;
+        emulator->state->ip += 4;
       } else { // mov [r/m16] imm8 // TODO: [r/m8]?
-        ModRM *modrm = make_modrm(*(ram + registerState->ip + 1));
-        registerState->ip += 3;
+        ModRM *modrm = make_modrm(*(emulator->ram + emulator->state->ip + 1));
+        emulator->state->ip += 3;
       }
     } else if ((curr_insn & 0b10000000) == 0b10000000) {
       bool sign = curr_insn & 0b00000010;
       bool word = curr_insn & 0b00000001;
       if (!sign && word) { // add r/m16 imm16
-        ModRM *modrm = make_modrm(*(ram + registerState->ip + 1));
-        registerState->ip += 4;
+        ModRM *modrm = make_modrm(*(emulator->ram + emulator->state->ip + 1));
+        emulator->state->ip += 4;
       } else { // add r/m16 imm8
-        ModRM *modrm = make_modrm(*(ram + registerState->ip + 1));
-        uint16_t data = sign_extend(*(ram + registerState->ip + 2));
-        uint16_t segment = get_segment_by_sop(registerState, curr_seg);
-        uint16_t offset = *((uint16_t *)registerState + modrm->rm);
-        ram[calculate_address(segment, offset)] += data;
-        ram[calculate_address(segment, offset) + 1] += data >> 8;
-        registerState->ip += 3;
+        ModRM *modrm = make_modrm(*(emulator->ram + emulator->state->ip + 1));
+        uint16_t data = sign_extend(*(emulator->ram + emulator->state->ip + 2));
+        uint16_t segment = get_segment_by_sop(emulator->state, curr_seg);
+        uint16_t offset = *((uint16_t *)emulator->state + modrm->rm);
+        emulator->ram[calculate_address(segment, offset)] += data;
+        emulator->ram[calculate_address(segment, offset) + 1] += data >> 8;
+        emulator->state->ip += 3;
       }
-    } else if (registerState->ip >= 0xFFFE) {
+    } else if (emulator->state->ip >= 0xFFFE) {
       break;
     } else if (curr_insn == 0) { // add r/m8, r8
-      registerState->ip += 2;
+      emulator->state->ip += 2;
     } else if (curr_insn == 1) { // add r/m16, r16
-      registerState->ip += 2;
+      emulator->state->ip += 2;
     } else if (curr_insn == 2) { // add r8, r/m8
-      ModRM *modrm = make_modrm(*(ram + registerState->ip + 1));
+      ModRM *modrm = make_modrm(*(emulator->ram + emulator->state->ip + 1));
       if (modrm->mod == MOD_REGISTER) {
         uint8_t dest = modrm->mid;
         uint8_t src = modrm->rm;
-        add_8bit_by_register_encoding(registerState, dest, get_8bit_by_register_encoding(registerState, src));
+        add_8bit_by_register_encoding(emulator->state, dest, get_8bit_by_register_encoding(emulator->state, src));
       }
-      registerState->ip += 2;
+      emulator->state->ip += 2;
     } else if (curr_insn == 3) { // add r16, r/m16
-      registerState->ip += 2;
+      emulator->state->ip += 2;
     }
+    if (single) break;
   }
-
 }
 
-#ifdef TEST_8086EMULATE
-
-int main(int argc, char *argv[]) {
-  assert(calculate_address(0x08F1, 0x0100) == 0x09010);
-
-  uint8_t *ram = calloc(0xFFFFF, sizeof(uint8_t));
-  RegisterState *registerState = calloc(1, sizeof(RegisterState));
-  registerState->ip = 0x0000;
-
-  // TODO: Fix these instruction comments
-  // inc bp
-  *ram = 0b01000101;
-  // inc cx
-  *(ram + 1) = 0b11111111;
-  *(ram + 2) = 0b11000001;
-  // incw 0x5c(si)
-  *(ram + 3) = 0b11111111;
-  *(ram + 4) = 0b01000100;
-  *(ram + 5) = 0b01011100;
-  registerState->ds = 0b1111000011110000;
-  registerState->si = 0b1010000010000110;
-  // es incw 0x5c(si)
-  *(ram + 6) = 0b00100110;
-  *(ram + 7) = 0b11111111;
-  *(ram + 8) = 0b01000100;
-  *(ram + 9) = 0b01011100;
-  registerState->es = 0b0000000011110000;
-  registerState->si = 0b1010000010000110;
-  // incb 0x5af0
-  *(ram + 10) = 0b11111110;
-  *(ram + 11) = 0b00000110;
-  *(ram + 12) = 0b11110000;
-  *(ram + 13) = 0b01011010;
-  // add ch, bl
-  *(ram + 14) = 0b00000010;
-  *(ram + 15) = 0b11101011;
-  registerState->bx = 5;
-  // mov di, 0xf00f
-  *(ram + 16) = 0b10111111;
-  *(ram + 17) = 0b00001111;
-  *(ram + 18) = 0b11110000;
-  // movw [di], 0xf00f // TODO: Wrong bit pattern?
-  *(ram + 19) = 0b11000111;
-  *(ram + 20) = 0b00000111;
-  *(ram + 21) = 0b00001111;
-  *(ram + 22) = 0b11110000;
-  // addw [di], 0x0f
-  *(ram + 23) = 0b10000011;
-  *(ram + 24) = 0b00000111;
-  *(ram + 25) = 0b00001111;
-
-  execute(registerState, ram);
-
-  assert(registerState->bp == 1);
-  //assert(registerState->cx == 1);
-  assert(ram[0b11111010111111100010] == 1);
-  assert(ram[0b00001010111111100010] == 1);
-  assert(ram[calculate_address(registerState->ds, 0x5af0)] == 1);
-  assert(registerState->cx == (5 << 8) + 1);
-  assert(registerState->di == 0xf00f);
-  assert(ram[calculate_address(0xf0f0, 0xf00f)] == 0x1e);
-  assert(ram[calculate_address(0xf0f0, 0xf00f) + 1] == 0xf0);
-
-  return 0;
+Emulator *makeEmulator(uint8_t *payload) {
+  Emulator *result = calloc(1, sizeof(Emulator));
+  result->state = calloc(1, sizeof(RegisterState));
+  result->ram = calloc(0xFFFFF, sizeof(uint8_t));
+  memcpy(result->ram, payload, 0xFFFFF);
+  return result;
 }
 
-#endif
+void change_payload(Emulator *emulator, uint8_t *payload) {
+  free(emulator->ram);
+  emulator->ram = calloc(0xFFFFF, sizeof(uint8_t));
+  memcpy(emulator->ram, payload, 0xFFFFF);
+}
