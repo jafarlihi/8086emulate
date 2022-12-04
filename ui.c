@@ -12,6 +12,7 @@ WINDOW *topbar, *bottombar;
 char *objdump;
 Emulator *emulator;
 int step = 0;
+bool code_remaining = true;
 
 void terminal_start();
 void terminal_stop();
@@ -60,6 +61,13 @@ void draw_objdump(void) {
   wprintw(topbar, "%s\n", objdump);
   wmove(topbar, step++, 0);
   waddch(topbar, '>');
+  chtype *content = calloc(1000, sizeof(chtype));
+  winchstr(topbar, content);
+  while (*content) {
+    if (*content == '.')
+      code_remaining = false;
+    content += 1;
+  }
   wrefresh(topbar);
 }
 
@@ -139,13 +147,14 @@ void single_step(void) {
 
 void run(void) {
   execute(emulator, false);
-  refresh_all(0);
   step = 0xFFFFF;
+  refresh_all(0);
 }
 
 void reset(void) {
   reset_emulator(emulator);
   step = 0;
+  code_remaining = true;
   refresh_all(0);
 }
 
@@ -169,12 +178,20 @@ void init_ui(Emulator *emu) {
 
     if (c == 'q')
       break;
-    else if (c == 's')
+    else if (c == 's' && code_remaining)
       single_step();
-    else if (c == 'r')
+    else if (c == 'r' && code_remaining)
       run();
     else if (c == 'x')
       reset();
+    else if (c == KEY_UP) {
+      wscrl(topbar, -1);
+      wrefresh(topbar);
+    }
+    else if (c == KEY_DOWN) {
+      wscrl(topbar, 1);
+      wrefresh(topbar);
+    }
   }
 
   terminal_stop();
