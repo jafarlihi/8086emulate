@@ -99,7 +99,7 @@ void draw_registers(void) {
   sprintf(output, "CS: "BYTE_TO_BINARY_PATTERN" "BYTE_TO_BINARY_PATTERN" | DS: "BYTE_TO_BINARY_PATTERN" "BYTE_TO_BINARY_PATTERN" | SS: "BYTE_TO_BINARY_PATTERN" "BYTE_TO_BINARY_PATTERN" | ES: "BYTE_TO_BINARY_PATTERN" "BYTE_TO_BINARY_PATTERN, BYTE_TO_BINARY(emulator->state->cs >> 8), BYTE_TO_BINARY(emulator->state->cs), BYTE_TO_BINARY(emulator->state->ds >> 8), BYTE_TO_BINARY(emulator->state->ds), BYTE_TO_BINARY(emulator->state->ss >> 8), BYTE_TO_BINARY(emulator->state->ss), BYTE_TO_BINARY(emulator->state->es >> 8), BYTE_TO_BINARY(emulator->state->es));
   wprintw(bottombar, "%s\n", output);
   wmove(bottombar, 4, 1);
-  sprintf(output, "IP: "BYTE_TO_BINARY_PATTERN" "BYTE_TO_BINARY_PATTERN" | Flags: "BYTE_TO_BINARY_PATTERN" "BYTE_TO_BINARY_PATTERN, BYTE_TO_BINARY(emulator->state->ip >> 8), BYTE_TO_BINARY(emulator->state->ip), BYTE_TO_BINARY(emulator->state->flags >> 8), BYTE_TO_BINARY(emulator->state->flags));
+  sprintf(output, "IP: "BYTE_TO_BINARY_PATTERN" "BYTE_TO_BINARY_PATTERN" | Flags: "BYTE_TO_BINARY_PATTERN" "BYTE_TO_BINARY_PATTERN, BYTE_TO_BINARY(emulator->state->ip >> 8), BYTE_TO_BINARY(emulator->state->ip), BYTE_TO_BINARY(emulator->state->flags.value >> 8), BYTE_TO_BINARY(emulator->state->flags.value));
   wprintw(bottombar, "%s\n", output);
   wborder(bottombar, 0, 0, 0, 0, 0, 0, 0, 0);
   draw_help();

@@ -4,6 +4,28 @@
 #include <stdint.h>
 #include <stdbool.h>
 
+typedef union Flags {
+  uint16_t value;
+  struct {
+    uint8_t CF : 1;
+    uint8_t : 1;
+    uint8_t PF : 1;
+    uint8_t : 1;
+    uint8_t AF : 1;
+    uint8_t : 1;
+    uint8_t ZF : 1;
+    uint8_t SF : 1;
+    uint8_t TF : 1;
+    uint8_t IF : 1;
+    uint8_t DF : 1;
+    uint8_t OF : 1;
+    uint8_t : 1;
+    uint8_t : 1;
+    uint8_t : 1;
+    uint8_t : 1;
+  };
+} Flags;
+
 typedef struct RegisterState {
   uint16_t ax;
   uint16_t cx;
@@ -18,7 +40,7 @@ typedef struct RegisterState {
   uint16_t ss;
   uint16_t es;
   uint16_t ip;
-  uint16_t flags;
+  Flags flags;
 } RegisterState;
 
 typedef struct Emulator {
